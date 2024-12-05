@@ -1,30 +1,44 @@
-'use client'
-
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-
-// Mock data for projects
-const mockProjects = [
-  { id: 1, name: 'Project A', description: 'Description for Project A' },
-  { id: 2, name: 'Project B', description: 'Description for Project B' },
-]
+import { Link } from 'react-router-dom'
+import apiClient from '@/lib/client'
 
 export default function ProjectList() {
-  const [projects, setProjects] = useState(mockProjects)
+  const [projects, setProjects] = useState([])
   const [newProject, setNewProject] = useState({ name: '', description: '' })
+  const [loading, setLoading] = useState(true)
 
-  const handleAddProject = (e: React.FormEvent) => {
-    e.preventDefault()
-    const project = {
-      id: projects.length + 1,
-      ...newProject,
+  // Fetch projects from the backend
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await apiClient.get('/api/projects')
+        setProjects(response.data)
+      } catch (error) {
+        console.error('Error fetching projects:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-    setProjects([...projects, project])
-    setNewProject({ name: '', description: '' })
+    fetchProjects()
+  }, [])
+
+  // Add a new project
+  const handleAddProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const response = await apiClient.post('/api/projects/create', newProject)
+      setProjects([...projects, response.data])
+      setNewProject({ name: '', description: '' })
+    } catch (error) {
+      console.error('Error adding project:', error)
+    }
   }
+
+  if (loading) return <p>Loading projects...</p>
 
   return (
     <Card>
@@ -32,7 +46,17 @@ export default function ProjectList() {
         <CardTitle>Projects</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleAddProject} className="mb-4 space-y-2">
+        <ul className="space-y-8">
+          {projects.map((project) => (
+            <li key={project.project_id} className="border p-2 rounded">
+              <Link to={`/projects/${project.project_id}`} className="block hover:bg-gray-100 transition duration-150 ease-in-out">
+                <h3 className="font-semibold">{project.name}</h3>
+                <p className="text-sm text-gray-600">{project.description}</p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <form onSubmit={handleAddProject} className="mt-8 space-y-6">
           <Input
             placeholder="Project Name"
             value={newProject.name}
@@ -46,16 +70,7 @@ export default function ProjectList() {
           />
           <Button type="submit">Add Project</Button>
         </form>
-        <ul className="space-y-2">
-          {projects.map((project) => (
-            <li key={project.id} className="border p-2 rounded">
-              <h3 className="font-semibold">{project.name}</h3>
-              <p className="text-sm text-gray-600">{project.description}</p>
-            </li>
-          ))}
-        </ul>
       </CardContent>
     </Card>
   )
 }
-

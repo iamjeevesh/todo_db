@@ -4,16 +4,15 @@ import './index.css'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import DashboardPage from './pages/dashboard.tsx'
 import AuthPage from './pages/auth.tsx'
+import ProjectPage from './pages/project-detail.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-<BrowserRouter>
+  <BrowserRouter>
     <Routes>
-      <Route path="/auth" element={<AuthPage />} />
-      <Route path="dashboard" element={<DashboardPage />}>
-        {/* <Route index element={<RecentActivity />} />
-        <Route path="project/:id" element={<Project />} /> */}
-      </Route>
+      <Route path="/" element={<AuthPage />} />
+      <Route path="dashboard" element={<DashboardPage />} />
+      <Route path="projects/:id" element={<ProjectPage />} />
     </Routes>
   </BrowserRouter>
   </StrictMode>,

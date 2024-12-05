@@ -4,9 +4,11 @@ const {initTables} = require('./setup');
 const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
+const cors = require('cors')
+
 require('dotenv').config();
 
-const secretkey = process.env.secret_key;
+const secretKey = process.env.SECRET_KEY;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,6 +19,7 @@ const sql = postgres(process.env.DB_URL);
 // Middleware to parse JSON
 app.use(express.json());
 app.use(cookieParser());
+app.use(cors({credentials: true, origin: process.env.CORS_ORIGIN}));
 
 function authenticate(req, res, next) {
     const token = req.cookies.auth_token;
@@ -59,7 +62,7 @@ app.post('/api/users/register', async (req, res) => {
         VALUES (${username}, ${email}, ${password_hash})
         RETURNING *;
       `;
-      const token = jwt.sign({ userId: user.id }, secretKey, { expiresIn: '1h' });
+      const token = jwt.sign({ userId: user.user_id }, secretKey, { expiresIn: '1h' });
 
     // Send JWT in a cookie
       res.cookie('auth_token', token, {
@@ -73,6 +76,44 @@ app.post('/api/users/register', async (req, res) => {
       res.status(500).json({ error: error.message });
     }
   });
+
+app.post('/api/users/logout', authenticate, async (req, res) => {
+    res.clearCookie('auth_token');
+    res.status(204).end();
+});
+
+  
+app.post('/api/users/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+
+    const [existingUser] = await sql`SELECT * FROM Users WHERE email = ${email}`;
+
+    if (!existingUser) {
+      return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    const isValid = await bcrypt.compare(password, existingUser.password_hash);
+
+    if (!isValid) {
+      return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    const token = jwt.sign({ userId: existingUser.user_id }, secretKey, { expiresIn: '1h' });
+
+  // Send JWT in a cookie
+    res.cookie('auth_token', token, {
+        httpOnly: true,  // Prevent client-side access to the cookie
+        secure: process.env.NODE_ENV === 'production', // Only set cookie over HTTPS in production
+        maxAge: 3600000,  // 1 hour expiry
+    });
+
+    res.status(201).json(existingUser);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Projects
 app.get('/api/projects', authenticate,async (req, res) => {
@@ -109,11 +150,11 @@ app.get('/api/projects/:projectId/tasks',authenticate, async (req, res) => {
 });
 
 app.post('/api/projects/:projectId/tasks/create',authenticate, async (req, res) => {
-  const { assigned_to, title, description, status, priority, due_date } = req.body;
+  const { assigned_to, title, description, status, priority } = req.body;
   try {
     const [task] = await sql`
-      INSERT INTO Tasks (project_id, assigned_to, title, description, status, priority, due_date)
-      VALUES (${req.params.projectId}, ${assigned_to}, ${title}, ${description}, ${status}, ${priority}, ${due_date})
+      INSERT INTO Tasks (project_id, title, description, status, priority)
+      VALUES (${req.params.projectId}, ${assigned_to}, ${title}, ${description}, ${status}, ${priority})
       RETURNING *;
     `;
     res.status(201).json(task);
